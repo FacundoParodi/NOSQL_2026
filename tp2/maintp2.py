@@ -73,7 +73,6 @@ cargar_temporada_3()
 
 #----------------------------------------------------------------------------------
 
-#FUNCION NUEVA Q LISTA LOS CAPITULOS YA Q LA MIA NO HACE ESO
 @app.route('/capitulos')
 def listar_capitulos():
     resultado = [] #lista para guardar los datos del cap
