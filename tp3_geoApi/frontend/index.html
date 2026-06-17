@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TurismoGeo - Puntos de Interés con Redis</title>
+    
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <i class="fa-solid fa-map-location-dot"></i>
+                <h1>TurismoGeo</h1>
+                <span class="badge-redis">Geo Redis</span>
+            </div>
+            <div class="status-indicator">
+                <span id="backend-status" class="status-dot offline"></span>
+                <span id="backend-status-text">Conectando backend...</span>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <main class="app-layout">
+            
+            <!-- Left Panel: Controls & Creation -->
+            <section class="panel-left">
+                
+                <!-- User Location Coordinates -->
+                <div class="glass-card user-location-card">
+                    <h3><i class="fa-solid fa-location-crosshairs text-primary"></i> Mi Ubicación</h3>
+                    <p class="section-desc">Haz clic en cualquier parte del mapa para fijar tu posición actual.</p>
+                    <div class="coordinates-display">
+                        <div class="coord-box">
+                            <span class="coord-label">Latitud</span>
+                            <span id="user-lat" class="coord-val">-32.4846</span>
+                        </div>
+                        <div class="coord-box">
+                            <span class="coord-label">Longitud</span>
+                            <span id="user-lon" class="coord-val">-58.2322</span>
+                        </div>
+                    </div>
+                    <div class="alert-box info-alert">
+                        <i class="fa-solid fa-info-circle"></i>
+                        <span>Posición inicial en Concepción del Uruguay, Entre Ríos por defecto.</span>
+                    </div>
+                </div>
+
+                <!-- Add New POI Form -->
+                <div class="glass-card add-poi-card">
+                    <h3><i class="fa-solid fa-circle-plus text-success"></i> Registrar Punto de Interés</h3>
+                    <p class="section-desc">Completa los datos para guardar un nuevo lugar en Redis.</p>
+                    <form id="add-poi-form" autocomplete="off">
+                        <div class="form-group">
+                            <label for="poi-category"><i class="fa-solid fa-tags"></i> Categoría</label>
+                            <select id="poi-category" required>
+                                <option value="" disabled selected>Selecciona una categoría</option>
+                                <option value="cervecerias">🍻 Cervecerías artesanales</option>
+                                <option value="universidades">🎓 Universidades</option>
+                                <option value="farmacias">💊 Farmacias</option>
+                                <option value="emergencias">🚨 Centros de emergencias</option>
+                                <option value="supermercados">🛒 Supermercados</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="poi-name"><i class="fa-solid fa-signature"></i> Nombre del Lugar</label>
+                            <input type="text" id="poi-name" placeholder="Ej. Cervecería 7 Colinas" required minlength="2" maxlength="100">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="poi-lat">Latitud</label>
+                                <input type="number" id="poi-lat" step="any" placeholder="-32.48" required min="-90" max="90">
+                            </div>
+                            <div class="form-group">
+                                <label for="poi-lon">Longitud</label>
+                                <input type="number" id="poi-lon" step="any" placeholder="-58.23" required min="-180" max="180">
+                            </div>
+                        </div>
+                        <div class="helper-text">
+                            <i class="fa-solid fa-circle-question"></i> Tip: Completa las coordenadas automáticamente haciendo clic en el mapa.
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="btn-submit-poi">
+                            <i class="fa-solid fa-floppy-disk"></i> Guardar en Redis
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Right Panel: Map & Results -->
+            <section class="panel-right">
+                
+                <!-- Map Container -->
+                <div class="glass-card map-card">
+                    <div class="map-header">
+                        <h3><i class="fa-solid fa-map"></i> Mapa de Exploración</h3>
+                        <div class="map-controls">
+                            <label for="search-radius"><i class="fa-solid fa-arrows-left-right-to-line"></i> Radio: <span id="radius-val">5</span> km</label>
+                            <input type="range" id="search-radius" min="1" max="25" value="5" class="slider">
+                        </div>
+                    </div>
+                    <div id="map"></div>
+                </div>
+
+                <!-- Results & Distance Calculator -->
+                <div class="glass-card results-card">
+                    <div class="results-header">
+                        <h3><i class="fa-solid fa-list-check"></i> Lugares Cercanos</h3>
+                        <div class="category-filters">
+                            <span class="filter-badge active" data-category="all">Todos</span>
+                            <span class="filter-badge" data-category="cervecerias" title="Cervecerías"><i class="fa-solid fa-beer-mug-empty"></i></span>
+                            <span class="filter-badge" data-category="universidades" title="Universidades"><i class="fa-solid fa-graduation-cap"></i></span>
+                            <span class="filter-badge" data-category="farmacias" title="Farmacias"><i class="fa-solid fa-pills"></i></span>
+                            <span class="filter-badge" data-category="emergencias" title="Emergencias"><i class="fa-solid fa-truck-medical"></i></span>
+                            <span class="filter-badge" data-category="supermercados" title="Supermercados"><i class="fa-solid fa-cart-shopping"></i></span>
+                        </div>
+                    </div>
+
+                    <div class="results-container">
+                        <div id="no-results-msg" class="empty-state">
+                            <i class="fa-solid fa-location-dot"></i>
+                            <p>No se encontraron puntos de interés en un radio de <span id="current-radius-label">5</span> km.</p>
+                        </div>
+                        <ul id="poi-list" class="poi-list-styled">
+                            <!-- JS populated -->
+                        </ul>
+                    </div>
+
+                    <!-- GEODIST Detail Panel -->
+                    <div id="geodist-panel" class="geodist-panel hidden">
+                        <div class="geodist-title">
+                            <h4><i class="fa-solid fa-calculator text-accent"></i> Cálculo de Distancia Exacta (GEODIST)</h4>
+                            <button id="close-geodist-btn" class="close-btn">&times;</button>
+                        </div>
+                        <div class="geodist-body">
+                            <div class="geodist-flow">
+                                <span class="flow-node"><i class="fa-solid fa-user"></i> Tú</span>
+                                <span class="flow-line"></span>
+                                <span class="flow-node active-poi-node" id="active-poi-icon"><i class="fa-solid fa-location-pin"></i></span>
+                                <span class="flow-node" id="active-poi-name">POI</span>
+                            </div>
+                            <div class="geodist-result">
+                                <span class="geodist-value" id="exact-distance-val">0.00</span>
+                                <span class="geodist-unit">metros</span>
+                            </div>
+                            <div class="redis-command-log">
+                                <code>GEODIST poi:<span id="redis-cat">categoria</span> temp_user "<span id="redis-poi">poi</span>" m</code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <footer class="app-footer">
+            <p>Trabajo Práctico Geo Redis | Desarrollado con FastAPI, Redis & Leaflet.js</p>
+        </footer>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast hidden"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Custom JS -->
+    <script src="app.js"></script>
+</body>
+</html>

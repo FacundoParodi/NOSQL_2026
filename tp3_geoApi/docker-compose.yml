@@ -1,0 +1,52 @@
+services:
+  # Servicio de Base de Datos Redis con soporte Geoespacial
+  redis:
+    image: redis:7-alpine
+    container_name: tourism_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - tourism-network
+    restart: unless-stopped
+
+  # Servicio del Backend FastAPI
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tourism_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+    depends_on:
+      - redis
+    networks:
+      - tourism-network
+    restart: unless-stopped
+
+  # Servicio del Frontend Nginx (sirve archivos estáticos y actúa como proxy)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tourism_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - tourism-network
+    restart: unless-stopped
+
+networks:
+  tourism-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local
